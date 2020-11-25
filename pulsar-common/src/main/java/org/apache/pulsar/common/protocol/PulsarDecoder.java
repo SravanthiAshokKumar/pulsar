@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import java.text.SimpleDateFormat;
 
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.api.proto.PulsarApi.BaseCommand;
@@ -83,7 +84,7 @@ import org.slf4j.LoggerFactory;
  * Basic implementation of the channel handler to process inbound Pulsar data.
  */
 public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
-
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         // Get a buffer that contains the full frame
@@ -109,6 +110,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
 
             switch (cmd.getType()) {
             case PARTITIONED_METADATA:
+                System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - start - %s\n",
+                    sdf.format(System.currentTimeMillis()));
                 checkArgument(cmd.hasPartitionMetadata());
                 try {
                     interceptCommand(cmd);
@@ -119,6 +122,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 } finally {
                     cmd.getPartitionMetadata().recycle();
                 }
+                System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - end - %s\n",
+                                    sdf.format(System.currentTimeMillis()));
                 break;
 
             case PARTITIONED_METADATA_RESPONSE:
@@ -128,9 +133,14 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 break;
 
             case LOOKUP:
+                String s = new String(cmd.getLookupTopic().getTopic());
+                System.out.format("PulsarDecoder - channelRead_LOOKUP - start - %s - %s\n",
+                    sdf.format(System.currentTimeMillis()), s);
                 checkArgument(cmd.hasLookupTopic());
                 handleLookup(cmd.getLookupTopic());
                 cmd.getLookupTopic().recycle();
+                System.out.format("PulsarDecoder - channelRead_LOOKUP - end - %s - %s \n",
+                                    sdf.format(System.currentTimeMillis()), s);
                 break;
 
             case LOOKUP_RESPONSE:

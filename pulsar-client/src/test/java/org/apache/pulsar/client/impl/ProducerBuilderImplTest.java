@@ -51,7 +51,7 @@ public class ProducerBuilderImplTest {
         when(client.newProducer()).thenReturn(producerBuilderImpl);
 
         when(client.createProducerAsync(
-                any(ProducerConfigurationData.class), any(Schema.class), eq(null)))
+                any(ProducerConfigurationData.class), any(Schema.class), eq(null), 0))
                 .thenReturn(CompletableFuture.completedFuture(producer));
     }
 

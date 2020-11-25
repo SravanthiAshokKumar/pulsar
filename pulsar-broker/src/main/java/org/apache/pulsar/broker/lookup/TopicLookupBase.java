@@ -29,6 +29,7 @@ import java.net.URISyntaxException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.text.SimpleDateFormat;
 
 import javax.ws.rs.Encoded;
 import javax.ws.rs.WebApplicationException;
@@ -50,13 +51,18 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.Codec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.commons.lang.time.StopWatch;
 
 public class TopicLookupBase extends PulsarWebResource {
+    static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
     private static final String LOOKUP_PATH_V1 = "/lookup/v2/destination/";
     private static final String LOOKUP_PATH_V2 = "/lookup/v2/topic/";
 
     protected void internalLookupTopicAsync(TopicName topicName, boolean authoritative, AsyncResponse asyncResponse) {
+        //System.out.println("internalLookupTopicAsync - topicName: "+topicName+" - "+sdf.format(System.currentTimeMillis()));
+        StopWatch sw = new StopWatch();
+        sw.start();
         if (!pulsar().getBrokerService().getLookupRequestSemaphore().tryAcquire()) {
             log.warn("No broker was found available for topic {}", topicName);
             asyncResponse.resume(new WebApplicationException(Response.Status.SERVICE_UNAVAILABLE));
@@ -112,7 +118,8 @@ public class TopicLookupBase extends PulsarWebResource {
                 }
                 completeLookupResponseExceptionally(asyncResponse,
                         new WebApplicationException(Response.temporaryRedirect(redirect).build()));
-
+                sw.stop();
+                System.out.println("internalLookupTopicAsync end - sw: "+sw.getTime());
             } else {
                 // Found broker owning the topic
                 if (log.isDebugEnabled()) {
@@ -125,6 +132,7 @@ public class TopicLookupBase extends PulsarWebResource {
             completeLookupResponseExceptionally(asyncResponse, exception);
             return null;
         });
+        System.out.println("internalLookupTopicAsync method end - "+sdf.format(System.currentTimeMillis()));
     }
 
     protected String internalGetNamespaceBundle(TopicName topicName) {
@@ -190,7 +198,18 @@ public class TopicLookupBase extends PulsarWebResource {
         final CompletableFuture<ByteBuf> validationFuture = new CompletableFuture<>();
         final CompletableFuture<ByteBuf> lookupfuture = new CompletableFuture<>();
         final String cluster = topicName.getCluster();
-
+        //final StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        
+        System.out.format("TopicLookupBase - lookupTopicAsync - start - %s - %s\n",
+            sdf.format(System.currentTimeMillis()), topicName);
+        
+        // for (StackTraceElement element : stackTrace) {
+        //     System.out.println(element.getMethodName() + " in class " + element.getClassName()
+        //     + " [on line number " + element.getLineNumber() + " of file " + element.getFileName() + "]");
+        // }
+        
+        StopWatch sw = new StopWatch();
+        sw.start();
         // (1) validate cluster
         getClusterDataIfDifferentCluster(pulsarService, cluster, clientAppId).thenAccept(differentClusterData -> {
 
@@ -210,10 +229,14 @@ public class TopicLookupBase extends PulsarWebResource {
                     log.warn("Failed to authorized {} on cluster {}", clientAppId, topicName.toString());
                     validationFuture.complete(newLookupErrorResponse(ServerError.AuthorizationError,
                             authException.getMessage(), requestId));
+                    System.out.format("TopicLookupBase - lookupTopicAsync - end - %s - %s\n",
+                        sdf.format(System.currentTimeMillis()), topicName);
                     return;
                 } catch (Exception e) {
                     log.warn("Unknown error while authorizing {} on cluster {}", clientAppId, topicName.toString());
                     validationFuture.completeExceptionally(e);
+                    System.out.format("TopicLookupBase - lookupTopicAsync - end - %s - %s\n",
+                                    sdf.format(System.currentTimeMillis()), topicName);
                     return;
                 }
                 // (3) validate global namespace
@@ -222,6 +245,8 @@ public class TopicLookupBase extends PulsarWebResource {
                             if (peerClusterData == null) {
                                 // (4) all validation passed: initiate lookup
                                 validationFuture.complete(null);
+                                System.out.format("TopicLookupBase - lookupTopicAsync - end - %s - %s\n",
+                                    sdf.format(System.currentTimeMillis()), topicName);
                                 return;
                             }
                             // if peer-cluster-data is present it means namespace is owned by that peer-cluster and
@@ -230,12 +255,13 @@ public class TopicLookupBase extends PulsarWebResource {
                                     && StringUtils.isBlank(peerClusterData.getBrokerServiceUrlTls())) {
                                 validationFuture.complete(newLookupErrorResponse(ServerError.MetadataError,
                                         "Redirected cluster's brokerService url is not configured", requestId));
+                                System.out.format("TopicLookupBase - lookupTopicAsync - checkLocalif2 - end - %s - %s\n",
+                                sdf.format(System.currentTimeMillis()), topicName);
                                 return;
                             }
                             validationFuture.complete(newLookupResponse(peerClusterData.getBrokerServiceUrl(),
                                     peerClusterData.getBrokerServiceUrlTls(), true, LookupType.Redirect, requestId,
                                     false));
-
                         }).exceptionally(ex -> {
                     validationFuture.complete(
                             newLookupErrorResponse(ServerError.MetadataError, ex.getMessage(), requestId));
@@ -244,6 +270,8 @@ public class TopicLookupBase extends PulsarWebResource {
             }
         }).exceptionally(ex -> {
             validationFuture.completeExceptionally(ex);
+            System.out.format("TopicLookupBase - lookupTopicAsync - exception - end - %s - %s\n",
+                                    sdf.format(System.currentTimeMillis()), topicName);
             return null;
         });
 
@@ -267,6 +295,8 @@ public class TopicLookupBase extends PulsarWebResource {
                             if (!lookupResult.isPresent()) {
                                 lookupfuture.complete(newLookupErrorResponse(ServerError.ServiceNotReady,
                                         "No broker was available to own " + topicName, requestId));
+                                System.out.format("TopicLookupBase - lookupTopicAsync - validationFutureIf - end - %s - %s\n",
+                                    sdf.format(System.currentTimeMillis()), topicName);
                                 return;
                             }
 
@@ -286,6 +316,9 @@ public class TopicLookupBase extends PulsarWebResource {
                                         lookupData.getBrokerUrlTls(), true /* authoritative */, LookupType.Connect,
                                         requestId, redirectThroughServiceUrl));
                             }
+                            sw.stop();
+                            // System.out.format("TopicLookupBase - lookupTopicAsync - validationFuture - end - %s - %s\n",
+                            //         sdf.format(System.currentTimeMillis()), topicName);
                         }).exceptionally(ex -> {
                     if (ex instanceof CompletionException && ex.getCause() instanceof IllegalStateException) {
                         log.info("Failed to lookup {} for topic {} with error {}", clientAppId,
@@ -310,9 +343,10 @@ public class TopicLookupBase extends PulsarWebResource {
             }
 
             lookupfuture.complete(newLookupErrorResponse(ServerError.ServiceNotReady, ex.getMessage(), requestId));
+            System.out.format("TopicLookupBase - lookupTopicAsync - exception2 - end - %s - %s\n",
+                                    sdf.format(System.currentTimeMillis()), topicName);
             return null;
         });
-
         return lookupfuture;
     }
 

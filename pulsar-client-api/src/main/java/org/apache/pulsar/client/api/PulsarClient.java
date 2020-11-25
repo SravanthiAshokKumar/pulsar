@@ -69,6 +69,8 @@ public interface PulsarClient extends Closeable {
      */
     ProducerBuilder<byte[]> newProducer();
 
+    ProducerBuilder<byte[]> newProducer(int client);
+
     /**
      * Create a producer builder that can be used to configure
      * and construct a producer with the specified schema.
@@ -113,6 +115,8 @@ public interface PulsarClient extends Closeable {
      * @since 2.0.0
      */
     ConsumerBuilder<byte[]> newConsumer();
+
+    ConsumerBuilder<byte[]> newConsumer(int client);
 
     /**
      * Create a consumer builder with a specific schema for subscribing on a specific topic

@@ -185,6 +185,7 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
     private final BlockingQueue<String> pendingChunckedMessageUuidQueue;
 
     private final boolean createTopicIfDoesNotExist;
+    private int client_id;
 
     private final AtomicReference<ClientCnx> clientCnxUsedForConsumerRegistration = new AtomicReference<>();
 
@@ -198,16 +199,17 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
                                                MessageId startMessageId,
                                                Schema<T> schema,
                                                ConsumerInterceptors<T> interceptors,
-                                               boolean createTopicIfDoesNotExist) {
+                                               boolean createTopicIfDoesNotExist,
+                                               int client_id) {
         if (conf.getReceiverQueueSize() == 0) {
             return new ZeroQueueConsumerImpl<>(client, topic, conf, listenerExecutor, partitionIndex, hasParentConsumer,
                     subscribeFuture,
                     startMessageId, schema, interceptors,
-                    createTopicIfDoesNotExist);
+                    createTopicIfDoesNotExist, client_id);
         } else {
             return new ConsumerImpl<>(client, topic, conf, listenerExecutor, partitionIndex, hasParentConsumer,
                     subscribeFuture, startMessageId, 0 /* rollback time in sec to start msgId */,
-                    schema, interceptors, createTopicIfDoesNotExist);
+                    schema, interceptors, createTopicIfDoesNotExist, client_id);
         }
     }
 
@@ -215,7 +217,7 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
             ExecutorService listenerExecutor, int partitionIndex, boolean hasParentConsumer,
             CompletableFuture<Consumer<T>> subscribeFuture, MessageId startMessageId,
             long startMessageRollbackDurationInSec, Schema<T> schema, ConsumerInterceptors<T> interceptors,
-            boolean createTopicIfDoesNotExist) {
+            boolean createTopicIfDoesNotExist, int client_id) {
         super(client, topic, conf, conf.getReceiverQueueSize(), listenerExecutor, subscribeFuture, schema, interceptors);
         this.consumerId = client.newConsumerId();
         this.subscriptionMode = conf.getSubscriptionMode();
@@ -237,6 +239,7 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
         this.pendingChunckedMessageUuidQueue = new GrowableArrayBlockingQueue<>();
         this.expireTimeOfIncompleteChunkedMessageMillis = conf.getExpireTimeOfIncompleteChunkedMessageMillis();
         this.autoAckOldestChunkedMessageOnQueueFull = conf.isAutoAckOldestChunkedMessageOnQueueFull();
+        this.client_id = client_id;
 
         if (client.getConfiguration().getStatsIntervalSeconds() > 0) {
             stats = new ConsumerStatsRecorderImpl(client, conf, this);
@@ -290,7 +293,7 @@ public class ConsumerImpl<T> extends ConsumerBase<T> implements ConnectionHandle
                                 .setMax(client.getConfiguration().getMaxBackoffIntervalNanos(), TimeUnit.NANOSECONDS)
                                 .setMandatoryStop(0, TimeUnit.MILLISECONDS)
                                 .create(),
-                this);
+                this, client_id);
 
         this.topicName = TopicName.get(topic);
         if (this.topicName.isPersistent()) {

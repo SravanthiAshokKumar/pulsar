@@ -73,7 +73,7 @@ public class HttpLookupService implements LookupService {
      * @return broker-socket-address that serves given topic
      */
     @SuppressWarnings("deprecation")
-    public CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName) {
+    public CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName, int client_id) {
         String basePath = topicName.isV2() ? BasePathV2 : BasePathV1;
 
         return httpClient.get(basePath + topicName.getLookupName(), LookupData.class).thenCompose(lookupData -> {
@@ -100,10 +100,18 @@ public class HttpLookupService implements LookupService {
         });
     }
 
-    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName) {
+    public CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName) {
+        return getBroker(topicName, 0);
+    }
+
+    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName, int client_id) {
         String format = topicName.isV2() ? "admin/v2/%s/partitions" : "admin/%s/partitions";
         return httpClient.get(String.format(format, topicName.getLookupName()) + "?checkAllowAutoCreation=true",
                 PartitionedTopicMetadata.class);
+    }
+
+    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName) {
+        return getPartitionedTopicMetadata(topicName, 0);
     }
 
     public String getServiceUrl() {

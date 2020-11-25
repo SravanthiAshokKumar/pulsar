@@ -53,10 +53,11 @@ public class ZeroQueueConsumerImpl<T> extends ConsumerImpl<T> {
             ExecutorService listenerExecutor, int partitionIndex, boolean hasParentConsumer, CompletableFuture<Consumer<T>> subscribeFuture,
             MessageId startMessageId, Schema<T> schema,
             ConsumerInterceptors<T> interceptors,
-            boolean createTopicIfDoesNotExist) {
+            boolean createTopicIfDoesNotExist,
+            int client_id) {
         super(client, topic, conf, listenerExecutor, partitionIndex, hasParentConsumer, subscribeFuture,
                 startMessageId, 0 /* startMessageRollbackDurationInSec */, schema, interceptors,
-                createTopicIfDoesNotExist);
+                createTopicIfDoesNotExist, client_id);
     }
 
     @Override

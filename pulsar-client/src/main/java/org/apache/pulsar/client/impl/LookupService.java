@@ -57,7 +57,9 @@ public interface LookupService extends AutoCloseable {
      *            topic-name
      * @return a pair of addresses, representing the logical and physical address of the broker that serves given topic
      */
-    CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName);
+	CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName);
+	
+	CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName, int client_id);
 
 	/**
 	 * Returns {@link PartitionedTopicMetadata} for a given topic.
@@ -66,6 +68,8 @@ public interface LookupService extends AutoCloseable {
 	 * @return
 	 */
 	CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName);
+
+	CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName, int client_id);
 
 	/**
 	 * Returns current SchemaInfo {@link SchemaInfo} for a given topic.

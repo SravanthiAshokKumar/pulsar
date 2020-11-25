@@ -70,16 +70,28 @@ public class ConsumerBuilderImpl<T> implements ConsumerBuilder<T> {
     private static long MIN_ACK_TIMEOUT_MILLIS = 1000;
     private static long MIN_TICK_TIME_MILLIS = 100;
     private static long DEFAULT_ACK_TIMEOUT_MILLIS_FOR_DEAD_LETTER = 30000L;
+    private static int client_id;
 
 
     public ConsumerBuilderImpl(PulsarClientImpl client, Schema<T> schema) {
         this(client, new ConsumerConfigurationData<T>(), schema);
     }
 
+    public ConsumerBuilderImpl(PulsarClientImpl client, Schema<T> schema, int client_id) {
+        this(client, new ConsumerConfigurationData<T>(), schema, client_id);
+    }
+
     ConsumerBuilderImpl(PulsarClientImpl client, ConsumerConfigurationData<T> conf, Schema<T> schema) {
         this.client = client;
         this.conf = conf;
         this.schema = schema;
+    }
+
+    ConsumerBuilderImpl(PulsarClientImpl client, ConsumerConfigurationData<T> conf, Schema<T> schema, int client_id) {
+        this.client = client;
+        this.conf = conf;
+        this.schema = schema;
+        this.client_id = client_id;
     }
 
     @Override
@@ -139,8 +151,8 @@ public class ConsumerBuilderImpl<T> implements ConsumerBuilder<T> {
             conf.getTopicNames().add(conf.getDeadLetterPolicy().getRetryLetterTopic());
         }
         return interceptorList == null || interceptorList.size() == 0 ?
-                client.subscribeAsync(conf, schema, null) :
-                client.subscribeAsync(conf, schema, new ConsumerInterceptors<>(interceptorList));
+                client.subscribeAsync(conf, schema, null, client_id) :
+                client.subscribeAsync(conf, schema, new ConsumerInterceptors<>(interceptorList), client_id);
     }
 
     @Override

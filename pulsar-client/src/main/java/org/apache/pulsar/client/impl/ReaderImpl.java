@@ -100,7 +100,7 @@ public class ReaderImpl<T> implements Reader<T> {
         consumer = new ConsumerImpl<>(client, readerConfiguration.getTopicName(), consumerConfiguration,
                 listenerExecutor, partitionIdx, false, consumerFuture,
                 readerConfiguration.getStartMessageId(), readerConfiguration.getStartMessageFromRollbackDurationInSec(),
-                schema, null, true /* createTopicIfDoesNotExist */);
+                schema, null, true /* createTopicIfDoesNotExist */, 0);
     }
 
     @Override

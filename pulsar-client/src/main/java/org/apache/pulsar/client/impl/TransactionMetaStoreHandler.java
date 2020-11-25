@@ -82,7 +82,7 @@ public class TransactionMetaStoreHandler extends HandlerState implements Connect
                 .setMax(pulsarClient.getConfiguration().getMaxBackoffIntervalNanos(), TimeUnit.NANOSECONDS)
                 .setMandatoryStop(100, TimeUnit.MILLISECONDS)
                 .create(),
-            this);
+            this, 0);
         this.connectionHandler.grabCnx();
     }
 

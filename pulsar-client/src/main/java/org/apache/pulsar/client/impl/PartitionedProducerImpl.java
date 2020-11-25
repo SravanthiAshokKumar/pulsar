@@ -130,7 +130,7 @@ public class PartitionedProducerImpl<T> extends ProducerBase<T> {
         for (int partitionIndex = 0; partitionIndex < topicMetadata.numPartitions(); partitionIndex++) {
             String partitionName = TopicName.get(topic).getPartition(partitionIndex).toString();
             ProducerImpl<T> producer = new ProducerImpl<>(client, partitionName, conf, new CompletableFuture<>(),
-                    partitionIndex, schema, interceptors);
+                    partitionIndex, schema, interceptors, 0);
             producers.add(producer);
             producer.producerCreatedFuture().handle((prod, createException) -> {
                 if (createException != null) {
@@ -311,7 +311,7 @@ public class PartitionedProducerImpl<T> extends ProducerBase<T> {
                             ProducerImpl<T> producer =
                                 new ProducerImpl<>(client,
                                     partitionName, conf, new CompletableFuture<>(),
-                                    partitionIndex, schema, interceptors);
+                                    partitionIndex, schema, interceptors, 0);
                             producers.add(producer);
                             return producer.producerCreatedFuture();
                         }).collect(Collectors.toList());

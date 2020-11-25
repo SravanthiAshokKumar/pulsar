@@ -59,6 +59,7 @@ public class ProducerBuilderImpl<T> implements ProducerBuilder<T> {
     private ProducerConfigurationData conf;
     private Schema<T> schema;
     private List<ProducerInterceptor> interceptorList;
+    private static int client_id;
 
     @VisibleForTesting
     public ProducerBuilderImpl(PulsarClientImpl client, Schema<T> schema) {
@@ -69,6 +70,17 @@ public class ProducerBuilderImpl<T> implements ProducerBuilder<T> {
         this.client = client;
         this.conf = conf;
         this.schema = schema;
+    }
+
+    public ProducerBuilderImpl(PulsarClientImpl client, Schema<T> schema, int client_id) {
+        this(client, new ProducerConfigurationData(), schema, client_id);
+    }
+
+    private ProducerBuilderImpl(PulsarClientImpl client, ProducerConfigurationData conf, Schema<T> schema, int client_id) {
+        this.client = client;
+        this.conf = conf;
+        this.schema = schema;
+        this.client_id = client_id;
     }
 
     /**
@@ -111,8 +123,8 @@ public class ProducerBuilderImpl<T> implements ProducerBuilder<T> {
         }
 
         return interceptorList == null || interceptorList.size() == 0 ?
-                client.createProducerAsync(conf, schema, null) :
-                client.createProducerAsync(conf, schema, new ProducerInterceptors(interceptorList));
+                client.createProducerAsync(conf, schema, null, client_id) :
+                client.createProducerAsync(conf, schema, new ProducerInterceptors(interceptorList), client_id);
     }
 
     @Override

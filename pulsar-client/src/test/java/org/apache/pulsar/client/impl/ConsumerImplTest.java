@@ -62,7 +62,7 @@ public class ConsumerImplTest {
         consumerConf.setSubscriptionName("test-sub");
         consumer = ConsumerImpl.newConsumerImpl(client, topic, consumerConf,
                 executorService, -1, false, subscribeFuture, null, null, null,
-                true);
+                true, 0);
         consumer.setState(HandlerState.State.Ready);
     }
 

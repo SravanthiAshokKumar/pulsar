@@ -111,8 +111,9 @@ public class PulsarClientImpl implements PulsarClient {
 
     private final EventLoopGroup eventLoopGroup;
 
-    private final LoadingCache<String, SchemaInfoProvider> schemaProviderLoadingCache = CacheBuilder.newBuilder().maximumSize(100000)
-                    .expireAfterAccess(30, TimeUnit.MINUTES).build(new CacheLoader<String, SchemaInfoProvider>() {
+    private final LoadingCache<String, SchemaInfoProvider> schemaProviderLoadingCache = CacheBuilder.newBuilder()
+            .maximumSize(100000).expireAfterAccess(30, TimeUnit.MINUTES)
+            .build(new CacheLoader<String, SchemaInfoProvider>() {
 
                 @Override
                 public SchemaInfoProvider load(String topicName) {
@@ -141,12 +142,15 @@ public class PulsarClientImpl implements PulsarClient {
         this.clientClock = conf.getClock();
         conf.getAuthentication().start();
         this.cnxPool = cnxPool;
-        externalExecutorProvider = new ExecutorProvider(conf.getNumListenerThreads(), getThreadFactory("pulsar-external-listener"));
-        internalExecutorService = new ExecutorProvider(conf.getNumIoThreads(), getThreadFactory("pulsar-client-internal"));
+        externalExecutorProvider = new ExecutorProvider(conf.getNumListenerThreads(),
+                getThreadFactory("pulsar-external-listener"));
+        internalExecutorService = new ExecutorProvider(conf.getNumIoThreads(),
+                getThreadFactory("pulsar-client-internal"));
         if (conf.getServiceUrl().startsWith("http")) {
             lookup = new HttpLookupService(conf, eventLoopGroup);
         } else {
-            lookup = new BinaryProtoLookupService(this, conf.getServiceUrl(), conf.getListenerName(), conf.isUseTls(), externalExecutorProvider.getExecutor());
+            lookup = new BinaryProtoLookupService(this, conf.getServiceUrl(), conf.getListenerName(), conf.isUseTls(),
+                    externalExecutorProvider.getExecutor());
         }
         timer = new HashedWheelTimer(getThreadFactory("pulsar-timer"), 1, TimeUnit.MILLISECONDS);
         producers = Maps.newIdentityHashMap();
@@ -186,6 +190,11 @@ public class PulsarClientImpl implements PulsarClient {
     }
 
     @Override
+    public ProducerBuilder<byte[]> newProducer(int client) {
+        return new ProducerBuilderImpl<>(this, Schema.BYTES, client);
+    }
+
+    @Override
     public <T> ProducerBuilder<T> newProducer(Schema<T> schema) {
         return new ProducerBuilderImpl<>(this, schema);
     }
@@ -193,6 +202,11 @@ public class PulsarClientImpl implements PulsarClient {
     @Override
     public ConsumerBuilder<byte[]> newConsumer() {
         return new ConsumerBuilderImpl<>(this, Schema.BYTES);
+    }
+
+    @Override
+    public ConsumerBuilder<byte[]> newConsumer(int client) {
+        return new ConsumerBuilderImpl<>(this, Schema.BYTES, client);
     }
 
     @Override
@@ -211,63 +225,61 @@ public class PulsarClientImpl implements PulsarClient {
     }
 
     public CompletableFuture<Producer<byte[]>> createProducerAsync(ProducerConfigurationData conf) {
-        return createProducerAsync(conf, Schema.BYTES, null);
+        return createProducerAsync(conf, Schema.BYTES, null, 0);
     }
 
-    public <T> CompletableFuture<Producer<T>> createProducerAsync(ProducerConfigurationData conf,  Schema<T> schema) {
-        return createProducerAsync(conf, schema, null);
+    public <T> CompletableFuture<Producer<T>> createProducerAsync(ProducerConfigurationData conf, Schema<T> schema) {
+        return createProducerAsync(conf, schema, null, 0);
     }
 
     public <T> CompletableFuture<Producer<T>> createProducerAsync(ProducerConfigurationData conf, Schema<T> schema,
-          ProducerInterceptors interceptors) {
+            ProducerInterceptors interceptors, int client_id) {
         if (conf == null) {
             return FutureUtil.failedFuture(
-                new PulsarClientException.InvalidConfigurationException("Producer configuration undefined"));
+                    new PulsarClientException.InvalidConfigurationException("Producer configuration undefined"));
         }
 
         if (schema instanceof AutoConsumeSchema) {
-            return FutureUtil.failedFuture(
-                new PulsarClientException.InvalidConfigurationException("AutoConsumeSchema is only used by consumers to detect schemas automatically"));
+            return FutureUtil.failedFuture(new PulsarClientException.InvalidConfigurationException(
+                    "AutoConsumeSchema is only used by consumers to detect schemas automatically"));
         }
 
         if (state.get() != State.Open) {
-            return FutureUtil.failedFuture(new PulsarClientException.AlreadyClosedException("Client already closed : state = " + state.get()));
+            return FutureUtil.failedFuture(
+                    new PulsarClientException.AlreadyClosedException("Client already closed : state = " + state.get()));
         }
 
         String topic = conf.getTopicName();
 
         if (!TopicName.isValid(topic)) {
             return FutureUtil.failedFuture(
-                new PulsarClientException.InvalidTopicNameException("Invalid topic name: '" + topic + "'"));
+                    new PulsarClientException.InvalidTopicNameException("Invalid topic name: '" + topic + "'"));
         }
 
         if (schema instanceof AutoProduceBytesSchema) {
             AutoProduceBytesSchema autoProduceBytesSchema = (AutoProduceBytesSchema) schema;
             if (autoProduceBytesSchema.schemaInitialized()) {
-                return createProducerAsync(topic, conf, schema, interceptors);
+                return createProducerAsync(topic, conf, schema, interceptors, client_id);
             }
-            return lookup.getSchema(TopicName.get(conf.getTopicName()))
-                    .thenCompose(schemaInfoOptional -> {
-                        if (schemaInfoOptional.isPresent()) {
-                            autoProduceBytesSchema.setSchema(Schema.getSchema(schemaInfoOptional.get()));
-                        } else {
-                            autoProduceBytesSchema.setSchema(Schema.BYTES);
-                        }
-                        return createProducerAsync(topic, conf, schema, interceptors);
-                    });
+            return lookup.getSchema(TopicName.get(conf.getTopicName())).thenCompose(schemaInfoOptional -> {
+                if (schemaInfoOptional.isPresent()) {
+                    autoProduceBytesSchema.setSchema(Schema.getSchema(schemaInfoOptional.get()));
+                } else {
+                    autoProduceBytesSchema.setSchema(Schema.BYTES);
+                }
+                return createProducerAsync(topic, conf, schema, interceptors, client_id);
+            });
         } else {
-            return createProducerAsync(topic, conf, schema, interceptors);
+            return createProducerAsync(topic, conf, schema, interceptors, client_id);
         }
 
     }
 
-    private <T> CompletableFuture<Producer<T>> createProducerAsync(String topic,
-                                                                   ProducerConfigurationData conf,
-                                                                   Schema<T> schema,
-                                                                   ProducerInterceptors interceptors) {
+    private <T> CompletableFuture<Producer<T>> createProducerAsync(String topic, ProducerConfigurationData conf,
+            Schema<T> schema, ProducerInterceptors interceptors, int client_id) {
         CompletableFuture<Producer<T>> producerCreatedFuture = new CompletableFuture<>();
 
-        getPartitionedTopicMetadata(topic).thenAccept(metadata -> {
+        getPartitionedTopicMetadata(topic, client_id).thenAccept(metadata -> {
             if (log.isDebugEnabled()) {
                 log.debug("[{}] Received topic metadata. partitions: {}", topic, metadata.partitions);
             }
@@ -277,7 +289,8 @@ public class PulsarClientImpl implements PulsarClient {
                 producer = new PartitionedProducerImpl<>(PulsarClientImpl.this, topic, conf, metadata.partitions,
                         producerCreatedFuture, schema, interceptors);
             } else {
-                producer = new ProducerImpl<>(PulsarClientImpl.this, topic, conf, producerCreatedFuture, -1, schema, interceptors);
+                producer = new ProducerImpl<>(PulsarClientImpl.this, topic, conf, producerCreatedFuture, -1, schema,
+                        interceptors, client_id);
             }
 
             synchronized (producers) {
@@ -292,11 +305,13 @@ public class PulsarClientImpl implements PulsarClient {
         return producerCreatedFuture;
     }
 
-    public CompletableFuture<Consumer<byte[]>> subscribeAsync(ConsumerConfigurationData<byte[]> conf) {
-        return subscribeAsync(conf, Schema.BYTES, null);
+    public CompletableFuture<Consumer<byte[]>> subscribeAsync(ConsumerConfigurationData<byte[]> conf, 
+        int client_id) {
+        return subscribeAsync(conf, Schema.BYTES, null, client_id);
     }
 
-    public <T> CompletableFuture<Consumer<T>> subscribeAsync(ConsumerConfigurationData<T> conf, Schema<T> schema, ConsumerInterceptors<T> interceptors) {
+    public <T> CompletableFuture<Consumer<T>> subscribeAsync(ConsumerConfigurationData<T> conf, Schema<T> schema,
+            ConsumerInterceptors<T> interceptors, int client_id) {
         if (state.get() != State.Open) {
             return FutureUtil.failedFuture(new PulsarClientException.AlreadyClosedException("Client already closed"));
         }
@@ -330,29 +345,31 @@ public class PulsarClientImpl implements PulsarClient {
 
         if (conf.getTopicsPattern() != null) {
             // If use topicsPattern, we should not use topic(), and topics() method.
-            if (!conf.getTopicNames().isEmpty()){
-                return FutureUtil
-                    .failedFuture(new IllegalArgumentException("Topic names list must be null when use topicsPattern"));
+            if (!conf.getTopicNames().isEmpty()) {
+                return FutureUtil.failedFuture(
+                        new IllegalArgumentException("Topic names list must be null when use topicsPattern"));
             }
             return patternTopicSubscribeAsync(conf, schema, interceptors);
         } else if (conf.getTopicNames().size() == 1) {
-            return singleTopicSubscribeAsync(conf, schema, interceptors);
+            return singleTopicSubscribeAsync(conf, schema, interceptors, client_id);
         } else {
-            return multiTopicSubscribeAsync(conf, schema, interceptors);
+            return multiTopicSubscribeAsync(conf, schema, interceptors, client_id);
         }
     }
 
-    private <T> CompletableFuture<Consumer<T>> singleTopicSubscribeAsync(ConsumerConfigurationData<T> conf, Schema<T> schema, ConsumerInterceptors<T> interceptors) {
+    private <T> CompletableFuture<Consumer<T>> singleTopicSubscribeAsync(ConsumerConfigurationData<T> conf,
+            Schema<T> schema, ConsumerInterceptors<T> interceptors, int client_id) {
         return preProcessSchemaBeforeSubscribe(this, schema, conf.getSingleTopic())
-            .thenCompose(schemaClone -> doSingleTopicSubscribeAsync(conf, schemaClone, interceptors));
+                .thenCompose(schemaClone -> doSingleTopicSubscribeAsync(conf, schemaClone, interceptors, client_id));
     }
 
-    private <T> CompletableFuture<Consumer<T>> doSingleTopicSubscribeAsync(ConsumerConfigurationData<T> conf, Schema<T> schema, ConsumerInterceptors<T> interceptors) {
+    private <T> CompletableFuture<Consumer<T>> doSingleTopicSubscribeAsync(ConsumerConfigurationData<T> conf,
+            Schema<T> schema, ConsumerInterceptors<T> interceptors, int client_id) {
         CompletableFuture<Consumer<T>> consumerSubscribedFuture = new CompletableFuture<>();
 
         String topic = conf.getSingleTopic();
 
-        getPartitionedTopicMetadata(topic).thenAccept(metadata -> {
+        getPartitionedTopicMetadata(topic, client_id).thenAccept(metadata -> {
             if (log.isDebugEnabled()) {
                 log.debug("[{}] Received topic metadata. partitions: {}", topic, metadata.partitions);
             }
@@ -362,12 +379,12 @@ public class PulsarClientImpl implements PulsarClient {
             ExecutorService listenerThread = externalExecutorProvider.getExecutor();
             if (metadata.partitions > 0) {
                 consumer = MultiTopicsConsumerImpl.createPartitionedConsumer(PulsarClientImpl.this, conf,
-                    listenerThread, consumerSubscribedFuture, metadata.partitions, schema, interceptors);
+                        listenerThread, consumerSubscribedFuture, metadata.partitions, schema, interceptors);
             } else {
                 int partitionIndex = TopicName.getPartitionIndex(topic);
-                consumer = ConsumerImpl.newConsumerImpl(PulsarClientImpl.this, topic, conf, listenerThread, partitionIndex, false,
-                        consumerSubscribedFuture,null, schema, interceptors,
-                        true /* createTopicIfDoesNotExist */);
+                consumer = ConsumerImpl.newConsumerImpl(PulsarClientImpl.this, topic, conf, listenerThread,
+                        partitionIndex, false, consumerSubscribedFuture, null, schema, interceptors,
+                        true /* createTopicIfDoesNotExist */, client_id);
             }
 
             synchronized (consumers) {
@@ -382,12 +399,13 @@ public class PulsarClientImpl implements PulsarClient {
         return consumerSubscribedFuture;
     }
 
-    private <T> CompletableFuture<Consumer<T>> multiTopicSubscribeAsync(ConsumerConfigurationData<T> conf, Schema<T> schema, ConsumerInterceptors<T> interceptors) {
+    private <T> CompletableFuture<Consumer<T>> multiTopicSubscribeAsync(ConsumerConfigurationData<T> conf,
+            Schema<T> schema, ConsumerInterceptors<T> interceptors, int client_id) {
         CompletableFuture<Consumer<T>> consumerSubscribedFuture = new CompletableFuture<>();
 
         ConsumerBase<T> consumer = new MultiTopicsConsumerImpl<>(PulsarClientImpl.this, conf,
                 externalExecutorProvider.getExecutor(), consumerSubscribedFuture, schema, interceptors,
-                true /* createTopicIfDoesNotExist */);
+                true /* createTopicIfDoesNotExist */, client_id);
 
         synchronized (consumers) {
             consumers.put(consumer, Boolean.TRUE);
@@ -408,32 +426,27 @@ public class PulsarClientImpl implements PulsarClient {
         NamespaceName namespaceName = destination.getNamespaceObject();
 
         CompletableFuture<Consumer<T>> consumerSubscribedFuture = new CompletableFuture<>();
-        lookup.getTopicsUnderNamespace(namespaceName, subscriptionMode)
-            .thenAccept(topics -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("Get topics under namespace {}, topics.size: {}", namespaceName.toString(), topics.size());
-                    topics.forEach(topicName ->
-                        log.debug("Get topics under namespace {}, topic: {}", namespaceName.toString(), topicName));
-                }
+        lookup.getTopicsUnderNamespace(namespaceName, subscriptionMode).thenAccept(topics -> {
+            if (log.isDebugEnabled()) {
+                log.debug("Get topics under namespace {}, topics.size: {}", namespaceName.toString(), topics.size());
+                topics.forEach(topicName -> log.debug("Get topics under namespace {}, topic: {}",
+                        namespaceName.toString(), topicName));
+            }
 
-                List<String> topicsList = topicsPatternFilter(topics, conf.getTopicsPattern());
-                conf.getTopicNames().addAll(topicsList);
-                ConsumerBase<T> consumer = new PatternMultiTopicsConsumerImpl<T>(conf.getTopicsPattern(),
-                    PulsarClientImpl.this,
-                    conf,
-                    externalExecutorProvider.getExecutor(),
-                    consumerSubscribedFuture,
+            List<String> topicsList = topicsPatternFilter(topics, conf.getTopicsPattern());
+            conf.getTopicNames().addAll(topicsList);
+            ConsumerBase<T> consumer = new PatternMultiTopicsConsumerImpl<T>(conf.getTopicsPattern(),
+                    PulsarClientImpl.this, conf, externalExecutorProvider.getExecutor(), consumerSubscribedFuture,
                     schema, subscriptionMode, interceptors);
 
-                synchronized (consumers) {
-                    consumers.put(consumer, Boolean.TRUE);
-                }
-            })
-            .exceptionally(ex -> {
-                log.warn("[{}] Failed to get topics under namespace", namespaceName);
-                consumerSubscribedFuture.completeExceptionally(ex);
-                return null;
-            });
+            synchronized (consumers) {
+                consumers.put(consumer, Boolean.TRUE);
+            }
+        }).exceptionally(ex -> {
+            log.warn("[{}] Failed to get topics under namespace", namespaceName);
+            consumerSubscribedFuture.completeExceptionally(ex);
+            return null;
+        });
 
         return consumerSubscribedFuture;
     }
@@ -442,13 +455,12 @@ public class PulsarClientImpl implements PulsarClient {
     // return result should contain only topic names, without partition part
     public static List<String> topicsPatternFilter(List<String> original, Pattern topicsPattern) {
         final Pattern shortenedTopicsPattern = topicsPattern.toString().contains("://")
-            ? Pattern.compile(topicsPattern.toString().split("\\:\\/\\/")[1]) : topicsPattern;
+                ? Pattern.compile(topicsPattern.toString().split("\\:\\/\\/")[1])
+                : topicsPattern;
 
-        return original.stream()
-            .map(TopicName::get)
-            .map(TopicName::toString)
-            .filter(topic -> shortenedTopicsPattern.matcher(topic.split("\\:\\/\\/")[1]).matches())
-            .collect(Collectors.toList());
+        return original.stream().map(TopicName::get).map(TopicName::toString)
+                .filter(topic -> shortenedTopicsPattern.matcher(topic.split("\\:\\/\\/")[1]).matches())
+                .collect(Collectors.toList());
     }
 
     public CompletableFuture<Reader<byte[]>> createReaderAsync(ReaderConfigurationData<byte[]> conf) {
@@ -457,7 +469,7 @@ public class PulsarClientImpl implements PulsarClient {
 
     public <T> CompletableFuture<Reader<T>> createReaderAsync(ReaderConfigurationData<T> conf, Schema<T> schema) {
         return preProcessSchemaBeforeSubscribe(this, schema, conf.getTopicName())
-            .thenCompose(schemaClone -> doCreateReaderAsync(conf, schemaClone));
+                .thenCompose(schemaClone -> doCreateReaderAsync(conf, schemaClone));
     }
 
     <T> CompletableFuture<Reader<T>> doCreateReaderAsync(ReaderConfigurationData<T> conf, Schema<T> schema) {
@@ -483,7 +495,7 @@ public class PulsarClientImpl implements PulsarClient {
 
         CompletableFuture<Reader<T>> readerFuture = new CompletableFuture<>();
 
-        getPartitionedTopicMetadata(topic).thenAccept(metadata -> {
+        getPartitionedTopicMetadata(topic, 0).thenAccept(metadata -> {
             if (log.isDebugEnabled()) {
                 log.debug("[{}] Received topic metadata. partitions: {}", topic, metadata.partitions);
             }
@@ -497,7 +509,8 @@ public class PulsarClientImpl implements PulsarClient {
             CompletableFuture<Consumer<T>> consumerSubscribedFuture = new CompletableFuture<>();
             // gets the next single threaded executor from the list of executors
             ExecutorService listenerThread = externalExecutorProvider.getExecutor();
-            ReaderImpl<T> reader = new ReaderImpl<>(PulsarClientImpl.this, conf, listenerThread, consumerSubscribedFuture, schema);
+            ReaderImpl<T> reader = new ReaderImpl<>(PulsarClientImpl.this, conf, listenerThread,
+                    consumerSubscribedFuture, schema);
 
             synchronized (consumers) {
                 consumers.put(reader.getConsumer(), Boolean.TRUE);
@@ -522,7 +535,8 @@ public class PulsarClientImpl implements PulsarClient {
     /**
      * Read the schema information for a given topic.
      *
-     * If the topic does not exist or it has no schema associated, it will return an empty response
+     * If the topic does not exist or it has no schema associated, it will return an
+     * empty response
      */
     public CompletableFuture<Optional<SchemaInfo>> getSchema(String topic) {
         TopicName topicName;
@@ -568,8 +582,10 @@ public class PulsarClientImpl implements PulsarClient {
         }
 
         // Need to run the shutdown sequence in a separate thread to prevent deadlocks
-        // If there are consumers or producers that need to be shutdown we cannot use the same thread
-        // to shutdown the EventLoopGroup as well as that would be trying to shutdown itself thus a deadlock
+        // If there are consumers or producers that need to be shutdown we cannot use
+        // the same thread
+        // to shutdown the EventLoopGroup as well as that would be trying to shutdown
+        // itself thus a deadlock
         // would happen
         FutureUtil.waitForAll(futures).thenRun(() -> new Thread(() -> {
             // All producers & consumers are now closed, we can stop the client safely
@@ -612,10 +628,10 @@ public class PulsarClientImpl implements PulsarClient {
         cnxPool.closeAllConnections();
     }
 
-    protected CompletableFuture<ClientCnx> getConnection(final String topic) {
+    protected CompletableFuture<ClientCnx> getConnection(final String topic, int client_id) {
         TopicName topicName = TopicName.get(topic);
-        return lookup.getBroker(topicName)
-                .thenCompose(pair -> cnxPool.getConnection(pair.getLeft(), pair.getRight()));
+        return lookup.getBroker(topicName, client_id)
+                     .thenCompose(pair -> cnxPool.getConnection(pair.getLeft(), pair.getRight()));
     }
 
     /** visible for pulsar-functions **/
@@ -661,46 +677,45 @@ public class PulsarClientImpl implements PulsarClient {
     }
 
     public CompletableFuture<Integer> getNumberOfPartitions(String topic) {
-        return getPartitionedTopicMetadata(topic).thenApply(metadata -> metadata.partitions);
+        return getPartitionedTopicMetadata(topic, 0).thenApply(metadata -> metadata.partitions);
     }
 
-    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(String topic) {
+    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(String topic, int client_id) {
 
         CompletableFuture<PartitionedTopicMetadata> metadataFuture = new CompletableFuture<>();
 
         try {
             TopicName topicName = TopicName.get(topic);
             AtomicLong opTimeoutMs = new AtomicLong(conf.getOperationTimeoutMs());
-            Backoff backoff = new BackoffBuilder()
-                    .setInitialTime(100, TimeUnit.MILLISECONDS)
-                    .setMandatoryStop(opTimeoutMs.get() * 2, TimeUnit.MILLISECONDS)
-                    .setMax(1, TimeUnit.MINUTES)
+            Backoff backoff = new BackoffBuilder().setInitialTime(100, TimeUnit.MILLISECONDS)
+                    .setMandatoryStop(opTimeoutMs.get() * 2, TimeUnit.MILLISECONDS).setMax(1, TimeUnit.MINUTES)
                     .create();
-            getPartitionedTopicMetadata(topicName, backoff, opTimeoutMs, metadataFuture);
+            getPartitionedTopicMetadata(topicName, backoff, opTimeoutMs, metadataFuture, client_id);
         } catch (IllegalArgumentException e) {
             return FutureUtil.failedFuture(new PulsarClientException.InvalidConfigurationException(e.getMessage()));
         }
         return metadataFuture;
     }
 
-    private void getPartitionedTopicMetadata(TopicName topicName,
-                                             Backoff backoff,
-                                             AtomicLong remainingTime,
-                                             CompletableFuture<PartitionedTopicMetadata> future) {
-        lookup.getPartitionedTopicMetadata(topicName).thenAccept(future::complete).exceptionally(e -> {
+    private void getPartitionedTopicMetadata(TopicName topicName, Backoff backoff, AtomicLong remainingTime,
+            CompletableFuture<PartitionedTopicMetadata> future, int client_id) {
+        lookup.getPartitionedTopicMetadata(topicName, client_id).thenAccept(future::complete).exceptionally(e -> {
             long nextDelay = Math.min(backoff.next(), remainingTime.get());
-            // skip retry scheduler when set lookup throttle in client or server side which will lead to `TooManyRequestsException`
-            boolean isLookupThrottling = !PulsarClientException.isRetriableError(e.getCause()) || e.getCause() instanceof PulsarClientException.TooManyRequestsException;
+            // skip retry scheduler when set lookup throttle in client or server side which
+            // will lead to `TooManyRequestsException`
+            boolean isLookupThrottling = !PulsarClientException.isRetriableError(e.getCause())
+                    || e.getCause() instanceof PulsarClientException.TooManyRequestsException;
             if (nextDelay <= 0 || isLookupThrottling) {
                 future.completeExceptionally(e);
                 return null;
             }
 
             ((ScheduledExecutorService) externalExecutorProvider.getExecutor()).schedule(() -> {
-                log.warn("[topic: {}] Could not get connection while getPartitionedTopicMetadata -- Will try again in {} ms",
-                    topicName, nextDelay);
+                log.warn(
+                        "[topic: {}] Could not get connection while getPartitionedTopicMetadata -- Will try again in {} ms",
+                        topicName, nextDelay);
                 remainingTime.addAndGet(-nextDelay);
-                getPartitionedTopicMetadata(topicName, backoff, remainingTime, future);
+                getPartitionedTopicMetadata(topicName, backoff, remainingTime, future, client_id);
             }, nextDelay, TimeUnit.MILLISECONDS);
             return null;
         });
@@ -708,7 +723,7 @@ public class PulsarClientImpl implements PulsarClient {
 
     @Override
     public CompletableFuture<List<String>> getPartitionsForTopic(String topic) {
-        return getPartitionedTopicMetadata(topic).thenApply(metadata -> {
+        return getPartitionedTopicMetadata(topic, 0).thenApply(metadata -> {
             if (metadata.partitions > 0) {
                 TopicName topicName = TopicName.get(topic);
                 List<String> partitions = new ArrayList<>(metadata.partitions);
@@ -759,14 +774,14 @@ public class PulsarClientImpl implements PulsarClient {
 
     private static Mode convertRegexSubscriptionMode(RegexSubscriptionMode regexSubscriptionMode) {
         switch (regexSubscriptionMode) {
-        case PersistentOnly:
-            return Mode.PERSISTENT;
-        case NonPersistentOnly:
-            return Mode.NON_PERSISTENT;
-        case AllTopics:
-            return Mode.ALL;
-        default:
-            return null;
+            case PersistentOnly:
+                return Mode.PERSISTENT;
+            case NonPersistentOnly:
+                return Mode.NON_PERSISTENT;
+            case AllTopics:
+                return Mode.ALL;
+            default:
+                return null;
         }
     }
 
@@ -780,8 +795,7 @@ public class PulsarClientImpl implements PulsarClient {
 
     @SuppressWarnings("unchecked")
     protected <T> CompletableFuture<Schema<T>> preProcessSchemaBeforeSubscribe(PulsarClientImpl pulsarClientImpl,
-                                                                      Schema<T> schema,
-                                                                      String topicName) {
+            Schema<T> schema, String topicName) {
         if (schema != null && schema.supportSchemaVersioning()) {
             final SchemaInfoProvider schemaInfoProvider;
             try {
@@ -797,9 +811,8 @@ public class PulsarClientImpl implements PulsarClient {
                     if (null == schemaInfo) {
                         if (!(finalSchema instanceof AutoConsumeSchema)) {
                             // no schema info is found
-                            return FutureUtil.failedFuture(
-                                    new PulsarClientException.NotFoundException(
-                                            "No latest schema found for topic " + topicName));
+                            return FutureUtil.failedFuture(new PulsarClientException.NotFoundException(
+                                    "No latest schema found for topic " + topicName));
                         }
                     }
                     try {
@@ -825,7 +838,8 @@ public class PulsarClientImpl implements PulsarClient {
     // Transaction related API
     //
 
-    // This method should be exposed in the PulsarClient interface. Only expose it when all the transaction features
+    // This method should be exposed in the PulsarClient interface. Only expose it
+    // when all the transaction features
     // are completed.
     // @Override
     public TransactionBuilder newTransaction() {

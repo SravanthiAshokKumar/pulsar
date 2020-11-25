@@ -44,12 +44,14 @@ public class ConnectionHandler {
     }
 
     protected Connection connection;
+    public int client_id;
 
-    protected ConnectionHandler(HandlerState state, Backoff backoff, Connection connection) {
+    protected ConnectionHandler(HandlerState state, Backoff backoff, Connection connection, int client_id) {
         this.state = state;
         this.connection = connection;
         this.backoff = backoff;
         CLIENT_CNX_UPDATER.set(this, null);
+        this.client_id = client_id;
     }
 
     protected void grabCnx() {
@@ -65,7 +67,7 @@ public class ConnectionHandler {
         }
 
         try {
-            state.client.getConnection(state.topic) //
+            state.client.getConnection(state.topic, client_id) //
                     .thenAccept(cnx -> connection.connectionOpened(cnx)) //
                     .exceptionally(this::handleConnectionError);
         } catch (Throwable t) {

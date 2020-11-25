@@ -140,7 +140,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
 
     public ProducerImpl(PulsarClientImpl client, String topic, ProducerConfigurationData conf,
                         CompletableFuture<Producer<T>> producerCreatedFuture, int partitionIndex, Schema<T> schema,
-                        ProducerInterceptors interceptors) {
+                        ProducerInterceptors interceptors, int client_id) {
         super(client, topic, conf, producerCreatedFuture, schema, interceptors);
         this.producerId = client.newProducerId();
         this.producerName = conf.getProducerName();
@@ -236,7 +236,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
 			    .setMax(client.getConfiguration().getMaxBackoffIntervalNanos(), TimeUnit.NANOSECONDS)
 			    .setMandatoryStop(Math.max(100, conf.getSendTimeoutMs() - 100), TimeUnit.MILLISECONDS)
 			    .create(),
-            this);
+            this, client_id);
 
         grabCnx();
     }

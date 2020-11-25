@@ -26,6 +26,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -57,13 +58,15 @@ public class BinaryProtoLookupService implements LookupService {
     private final String listenerName;
     private final int maxLookupRedirects;
 
-    public BinaryProtoLookupService(PulsarClientImpl client, String serviceUrl, boolean useTls, ExecutorService executor)
-            throws PulsarClientException {
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
+    public BinaryProtoLookupService(PulsarClientImpl client, String serviceUrl, boolean useTls,
+            ExecutorService executor) throws PulsarClientException {
         this(client, serviceUrl, null, useTls, executor);
     }
 
-    public BinaryProtoLookupService(PulsarClientImpl client, String serviceUrl, String listenerName, boolean useTls, ExecutorService executor)
-            throws PulsarClientException {
+    public BinaryProtoLookupService(PulsarClientImpl client, String serviceUrl, String listenerName, boolean useTls,
+            ExecutorService executor) throws PulsarClientException {
         this.client = client;
         this.useTls = useTls;
         this.executor = executor;
@@ -79,14 +82,18 @@ public class BinaryProtoLookupService implements LookupService {
     }
 
     /**
-     * Calls broker binaryProto-lookup api to find broker-service address which can serve a given topic.
+     * Calls broker binaryProto-lookup api to find broker-service address which can
+     * serve a given topic.
      *
-     * @param topicName
-     *            topic-name
+     * @param topicName topic-name
      * @return broker-socket-address that serves given topic
      */
+    public CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName, int client_id) {
+        return findBroker(serviceNameResolver.resolveHost(), false, topicName, client_id, 0);
+    }
+
     public CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> getBroker(TopicName topicName) {
-        return findBroker(serviceNameResolver.resolveHost(), false, topicName, 0);
+        return findBroker(serviceNameResolver.resolveHost(), false, topicName, 0, 0);
     }
 
     /**
@@ -94,13 +101,18 @@ public class BinaryProtoLookupService implements LookupService {
      *
      */
     public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName) {
-        return getPartitionedTopicMetadata(serviceNameResolver.resolveHost(), topicName);
+        return getPartitionedTopicMetadata(serviceNameResolver.resolveHost(), topicName, 0);
+    }
+
+    public CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(TopicName topicName, int client_id) {
+        return getPartitionedTopicMetadata(serviceNameResolver.resolveHost(), topicName, client_id);
     }
 
     private CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> findBroker(InetSocketAddress socketAddress,
-            boolean authoritative, TopicName topicName, final int redirectCount) {
+            boolean authoritative, TopicName topicName, int client_id, final int redirectCount) {
         CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> addressFuture = new CompletableFuture<>();
 
+        System.out.format("lookup - getBroker - %d - %s - %s - start\n", client_id, sdf.format(System.currentTimeMillis()), topicName);
         if (maxLookupRedirects > 0 && redirectCount > maxLookupRedirects) {
             addressFuture.completeExceptionally(
                     new PulsarClientException.LookupException("Too many redirects: " + maxLookupRedirects));
@@ -111,6 +123,8 @@ public class BinaryProtoLookupService implements LookupService {
             long requestId = client.newRequestId();
             ByteBuf request = Commands.newLookup(topicName.toString(), listenerName, authoritative, requestId);
             clientCnx.newLookup(request, requestId).whenComplete((r, t) -> {
+                System.out.format("lookup - getBroker - %d - %s - %s - end\n", client_id, sdf.format(System.currentTimeMillis()),
+                        topicName);
                 if (t != null) {
                     // lookup failed
                     log.warn("[{}] failed to send lookup request : {}", topicName.toString(), t.getMessage());
@@ -130,25 +144,27 @@ public class BinaryProtoLookupService implements LookupService {
                             uri = new URI(serviceUrl);
                         }
 
-                        InetSocketAddress responseBrokerAddress = InetSocketAddress.createUnresolved(uri.getHost(), uri.getPort());
+                        InetSocketAddress responseBrokerAddress = InetSocketAddress.createUnresolved(uri.getHost(),
+                                uri.getPort());
 
                         // (2) redirect to given address if response is: redirect
                         if (r.redirect) {
-                            findBroker(responseBrokerAddress, r.authoritative, topicName, redirectCount + 1)
-                                .thenAccept(addressFuture::complete).exceptionally((lookupException) -> {
-                                // lookup failed
-                                if (redirectCount > 0) {
-                                    if (log.isDebugEnabled()) {
-                                        log.debug("[{}] lookup redirection failed ({}) : {}", topicName.toString(),
-                                                redirectCount, lookupException.getMessage());
-                                    }
-                                } else {
-                                    log.warn("[{}] lookup failed : {}", topicName.toString(),
-                                            lookupException.getMessage(), lookupException);
-                                }
-                                addressFuture.completeExceptionally(lookupException);
-                                return null;
-                            });
+                            findBroker(responseBrokerAddress, r.authoritative, topicName, client_id, redirectCount + 1)
+                                    .thenAccept(addressFuture::complete).exceptionally((lookupException) -> {
+                                        // lookup failed
+                                        if (redirectCount > 0) {
+                                            if (log.isDebugEnabled()) {
+                                                log.debug("[{}] lookup redirection failed ({}) : {}",
+                                                        topicName.toString(), redirectCount,
+                                                        lookupException.getMessage());
+                                            }
+                                        } else {
+                                            log.warn("[{}] lookup failed : {}", topicName.toString(),
+                                                    lookupException.getMessage(), lookupException);
+                                        }
+                                        addressFuture.completeExceptionally(lookupException);
+                                        return null;
+                                    });
                         } else {
                             // (3) received correct broker to connect
                             if (r.proxyThroughServiceUrl) {
@@ -159,11 +175,14 @@ public class BinaryProtoLookupService implements LookupService {
                                 addressFuture.complete(Pair.of(responseBrokerAddress, responseBrokerAddress));
                             }
                         }
-
+                        System.out.format(
+                            "lookup - getBroker - %d - %s - %s - lastEnd\n", client_id,
+                            sdf.format(System.currentTimeMillis()), topicName
+                        );
                     } catch (Exception parseUrlException) {
                         // Failed to parse url
                         log.warn("[{}] invalid url {} : {}", topicName.toString(), uri, parseUrlException.getMessage(),
-                            parseUrlException);
+                                parseUrlException);
                         addressFuture.completeExceptionally(parseUrlException);
                     }
                 }
@@ -177,7 +196,7 @@ public class BinaryProtoLookupService implements LookupService {
     }
 
     private CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(InetSocketAddress socketAddress,
-            TopicName topicName) {
+            TopicName topicName, int client_id) {
 
         CompletableFuture<PartitionedTopicMetadata> partitionFuture = new CompletableFuture<PartitionedTopicMetadata>();
 
@@ -186,17 +205,19 @@ public class BinaryProtoLookupService implements LookupService {
             ByteBuf request = Commands.newPartitionMetadataRequest(topicName.toString(), requestId);
             clientCnx.newLookup(request, requestId).whenComplete((r, t) -> {
                 if (t != null) {
-                    log.warn("[{}] failed to get Partitioned metadata : {}", topicName.toString(),
-                        t.getMessage(), t);
+                    log.warn("[{}] failed to get Partitioned metadata : {}", topicName.toString(), t.getMessage(), t);
                     partitionFuture.completeExceptionally(t);
                 } else {
                     try {
                         partitionFuture.complete(new PartitionedTopicMetadata(r.partitions));
+                        System.out.format(
+                            "BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - end\n", client_id,
+                            sdf.format(System.currentTimeMillis()), topicName
+                        );
                     } catch (Exception e) {
                         partitionFuture.completeExceptionally(new PulsarClientException.LookupException(
-                            format("Failed to parse partition-response redirect=%s, topic=%s, partitions with %s",
-                                r.redirect, topicName.toString(), r.partitions,
-                                e.getMessage())));
+                                format("Failed to parse partition-response redirect=%s, topic=%s, partitions with %s",
+                                        r.redirect, topicName.toString(), r.partitions, e.getMessage())));
                     }
                 }
                 client.getCnxPool().releaseConnection(clientCnx);
@@ -214,7 +235,6 @@ public class BinaryProtoLookupService implements LookupService {
         return getSchema(topicName, null);
     }
 
-
     @Override
     public CompletableFuture<Optional<SchemaInfo>> getSchema(TopicName topicName, byte[] version) {
         InetSocketAddress socketAddress = serviceNameResolver.resolveHost();
@@ -223,11 +243,10 @@ public class BinaryProtoLookupService implements LookupService {
         client.getCnxPool().getConnection(socketAddress).thenAccept(clientCnx -> {
             long requestId = client.newRequestId();
             ByteBuf request = Commands.newGetSchema(requestId, topicName.toString(),
-                Optional.ofNullable(BytesSchemaVersion.of(version)));
+                    Optional.ofNullable(BytesSchemaVersion.of(version)));
             clientCnx.sendGetSchema(request, requestId).whenComplete((r, t) -> {
                 if (t != null) {
-                    log.warn("[{}] failed to get schema : {}", topicName.toString(),
-                        t.getMessage(), t);
+                    log.warn("[{}] failed to get schema : {}", topicName.toString(), t.getMessage(), t);
                     schemaFuture.completeExceptionally(t);
                 } else {
                     schemaFuture.complete(r);
@@ -251,32 +270,25 @@ public class BinaryProtoLookupService implements LookupService {
         CompletableFuture<List<String>> topicsFuture = new CompletableFuture<List<String>>();
 
         AtomicLong opTimeoutMs = new AtomicLong(client.getConfiguration().getOperationTimeoutMs());
-        Backoff backoff = new BackoffBuilder()
-                .setInitialTime(100, TimeUnit.MILLISECONDS)
-                .setMandatoryStop(opTimeoutMs.get() * 2, TimeUnit.MILLISECONDS)
-                .setMax(1, TimeUnit.MINUTES)
-                .create();
+        Backoff backoff = new BackoffBuilder().setInitialTime(100, TimeUnit.MILLISECONDS)
+                .setMandatoryStop(opTimeoutMs.get() * 2, TimeUnit.MILLISECONDS).setMax(1, TimeUnit.MINUTES).create();
         getTopicsUnderNamespace(serviceNameResolver.resolveHost(), namespace, backoff, opTimeoutMs, topicsFuture, mode);
         return topicsFuture;
     }
 
-    private void getTopicsUnderNamespace(InetSocketAddress socketAddress,
-                                         NamespaceName namespace,
-                                         Backoff backoff,
-                                         AtomicLong remainingTime,
-                                         CompletableFuture<List<String>> topicsFuture,
-                                         Mode mode) {
+    private void getTopicsUnderNamespace(InetSocketAddress socketAddress, NamespaceName namespace, Backoff backoff,
+            AtomicLong remainingTime, CompletableFuture<List<String>> topicsFuture, Mode mode) {
         client.getCnxPool().getConnection(socketAddress).thenAccept(clientCnx -> {
             long requestId = client.newRequestId();
-            ByteBuf request = Commands.newGetTopicsOfNamespaceRequest(
-                namespace.toString(), requestId, mode);
+            ByteBuf request = Commands.newGetTopicsOfNamespaceRequest(namespace.toString(), requestId, mode);
 
             clientCnx.newGetTopicsOfNamespace(request, requestId).whenComplete((r, t) -> {
                 if (t != null) {
                     topicsFuture.completeExceptionally(t);
                 } else {
                     if (log.isDebugEnabled()) {
-                        log.debug("[namespace: {}] Success get topics list in request: {}", namespace.toString(), requestId);
+                        log.debug("[namespace: {}] Success get topics list in request: {}", namespace.toString(),
+                                requestId);
                     }
 
                     // do not keep partition part of topic name
@@ -295,23 +307,21 @@ public class BinaryProtoLookupService implements LookupService {
         }).exceptionally((e) -> {
             long nextDelay = Math.min(backoff.next(), remainingTime.get());
             if (nextDelay <= 0) {
-                topicsFuture.completeExceptionally(
-                    new PulsarClientException.TimeoutException(
-                        format("Could not get topics of namespace %s within configured timeout",
-                            namespace.toString())));
+                topicsFuture.completeExceptionally(new PulsarClientException.TimeoutException(format(
+                        "Could not get topics of namespace %s within configured timeout", namespace.toString())));
                 return null;
             }
 
             ((ScheduledExecutorService) executor).schedule(() -> {
-                log.warn("[namespace: {}] Could not get connection while getTopicsUnderNamespace -- Will try again in {} ms",
-                    namespace, nextDelay);
+                log.warn(
+                        "[namespace: {}] Could not get connection while getTopicsUnderNamespace -- Will try again in {} ms",
+                        namespace, nextDelay);
                 remainingTime.addAndGet(-nextDelay);
                 getTopicsUnderNamespace(socketAddress, namespace, backoff, remainingTime, topicsFuture, mode);
             }, nextDelay, TimeUnit.MILLISECONDS);
             return null;
         });
     }
-
 
     @Override
     public void close() throws Exception {

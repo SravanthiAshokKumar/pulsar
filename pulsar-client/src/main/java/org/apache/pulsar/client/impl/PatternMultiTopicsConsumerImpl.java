@@ -56,7 +56,7 @@ public class PatternMultiTopicsConsumerImpl<T> extends MultiTopicsConsumerImpl<T
                                           CompletableFuture<Consumer<T>> subscribeFuture,
                                           Schema<T> schema, Mode subscriptionMode, ConsumerInterceptors<T> interceptors) {
         super(client, conf, listenerExecutor, subscribeFuture, schema, interceptors,
-                false /* createTopicIfDoesNotExist */);
+                false /* createTopicIfDoesNotExist */, 0);
         this.topicsPattern = topicsPattern;
         this.subscriptionMode = subscriptionMode;
 

@@ -99,7 +99,8 @@ public class ProducerStatsRecorderImpl implements ProducerStatsRecorder {
 
         try {
             log.info("Starting Pulsar producer perf with config: {}", w.writeValueAsString(conf));
-            log.info("Pulsar client config: {}", w.withoutAttribute("authentication").writeValueAsString(pulsarClient.getConfiguration()));
+            log.info("Pulsar client config: {}",
+                    w.withoutAttribute("authentication").writeValueAsString(pulsarClient.getConfiguration()));
         } catch (IOException e) {
             log.error("Failed to dump config info", e);
         }
@@ -147,10 +148,9 @@ public class ProducerStatsRecorderImpl implements ProducerStatsRecorder {
                             + "Ack received rate: {} ack/s --- Failed messages: {}", producer.getTopic(),
                             producer.getProducerName(), producer.getPendingQueueSize(),
                             THROUGHPUT_FORMAT.format(sendMsgsRate),
-                            THROUGHPUT_FORMAT.format(sendBytesRate / 1024 / 1024 * 8),
-                            DEC.format(latencyPctValues[0]), DEC.format(latencyPctValues[2]),
-                            DEC.format(latencyPctValues[3]), DEC.format(latencyPctValues[4]),
-                            DEC.format(latencyPctValues[5]),
+                            THROUGHPUT_FORMAT.format(sendBytesRate / 1024 / 1024 * 8), DEC.format(latencyPctValues[0]),
+                            DEC.format(latencyPctValues[2]), DEC.format(latencyPctValues[3]),
+                            DEC.format(latencyPctValues[4]), DEC.format(latencyPctValues[5]),
                             THROUGHPUT_FORMAT.format(currentNumAcksReceived / elapsed), currentNumSendFailedMsgs);
                 }
 

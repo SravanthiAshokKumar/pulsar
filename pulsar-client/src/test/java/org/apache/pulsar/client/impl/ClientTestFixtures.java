@@ -62,7 +62,7 @@ class ClientTestFixtures {
         when(clientCnxMock.sendRequestWithId(any(), anyLong()))
                 .thenReturn(CompletableFuture.completedFuture(mock(ProducerResponse.class)));
         when(clientCnxMock.channel().remoteAddress()).thenReturn(mock(SocketAddress.class));
-        when(clientMock.getConnection(any())).thenReturn(CompletableFuture.completedFuture(clientCnxMock));
+        when(clientMock.getConnection(any(), 0)).thenReturn(CompletableFuture.completedFuture(clientCnxMock));
         return clientMock;
     }
 
