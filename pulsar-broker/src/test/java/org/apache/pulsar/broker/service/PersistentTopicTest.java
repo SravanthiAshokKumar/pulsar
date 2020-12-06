@@ -1471,7 +1471,7 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
         verify(clientImpl)
             .createProducerAsync(
                 any(ProducerConfigurationData.class),
-                any(), eq(null)
+                any(), eq(null), 0
             );
 
         replicator.disconnect(false);
@@ -1479,7 +1479,7 @@ public class PersistentTopicTest extends MockedBookKeeperTestCase {
 
         replicator.startProducer();
 
-        verify(clientImpl, Mockito.times(2)).createProducerAsync(any(), any(), any());
+        verify(clientImpl, Mockito.times(2)).createProducerAsync(any(), any(), any(), 0);
     }
 
     @Test

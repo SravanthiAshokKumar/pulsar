@@ -37,6 +37,7 @@ import io.netty.handler.ssl.SslHandler;
 
 import java.net.SocketAddress;
 
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -179,6 +180,7 @@ public class ServerCnx extends PulsarHandler {
             AtomicLongFieldUpdater.newUpdater(ServerCnx.class, "messagePublishBufferSize");
     private volatile long messagePublishBufferSize = 0;
     private PulsarCommandSender commandSender;
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
     enum State {
         Start, Connected, Failed, Connecting
@@ -355,6 +357,7 @@ public class ServerCnx extends PulsarHandler {
         }
 
         TopicName topicName = validateTopicName(lookup.getTopic(), requestId, lookup);
+        System.out.format("ServerCnx - handleLookup - start - %s - %s\n", topicName, sdf.format(System.currentTimeMillis())); 
         if (topicName == null) {
             return;
         }
@@ -376,6 +379,7 @@ public class ServerCnx extends PulsarHandler {
                             requestId, advertisedListenerName).handle((lookupResponse, ex) -> {
                                 if (ex == null) {
                                     ctx.writeAndFlush(lookupResponse);
+                                    System.out.format("ServerCnx - handleLookup - end - %s - %s\n", topicName, sdf.format(System.currentTimeMillis()));
                                 } else {
                                     // it should never happen
                                     log.warn("[{}] lookup failed with error {}, {}", remoteAddress, topicName,

@@ -121,7 +121,7 @@ public class RawReaderImpl implements RawReader {
                 MessageId.earliest,
                 0 /* startMessageRollbackDurationInSec */,
                 Schema.BYTES, null,
-                true
+                true, 0
             );
             incomingRawMessages = new GrowableArrayBlockingQueue<>();
             pendingRawReceives = new ConcurrentLinkedQueue<>();

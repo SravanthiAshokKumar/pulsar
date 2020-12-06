@@ -107,7 +107,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 log.debug("[{}] Received cmd {}", ctx.channel().remoteAddress(), cmd.getType());
             }
             messageReceived();
-
+            System.out.format("PulsarDecoder - channelRead - start - %s - %s\n",
+                    sdf.format(System.currentTimeMillis()), cmd.getType());
             switch (cmd.getType()) {
             case PARTITIONED_METADATA:
                 System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - start - %s\n",
@@ -134,13 +135,14 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
 
             case LOOKUP:
                 String s = new String(cmd.getLookupTopic().getTopic());
-                System.out.format("PulsarDecoder - channelRead_LOOKUP - start - %s - %s\n",
-                    sdf.format(System.currentTimeMillis()), s);
+                long requestId = cmd.getLookupTopic().getRequestId();
+                System.out.format("PulsarDecoder - channelRead_LOOKUP - start - %s - %s - %d\n",
+                    sdf.format(System.currentTimeMillis()), s, requestId);
                 checkArgument(cmd.hasLookupTopic());
                 handleLookup(cmd.getLookupTopic());
                 cmd.getLookupTopic().recycle();
-                System.out.format("PulsarDecoder - channelRead_LOOKUP - end - %s - %s \n",
-                                    sdf.format(System.currentTimeMillis()), s);
+                System.out.format("PulsarDecoder - channelRead_LOOKUP - end - %s - %s - %d\n",
+                                    sdf.format(System.currentTimeMillis()), s, requestId);
                 break;
 
             case LOOKUP_RESPONSE:
@@ -482,6 +484,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 break;
             }
         } finally {
+            System.out.format("PulsarDecoder - channelRead - end - %s - %s\n",
+                    sdf.format(System.currentTimeMillis()), cmd.getType());
             if (cmdBuilder != null) {
                 cmdBuilder.recycle();
             }

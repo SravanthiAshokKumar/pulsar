@@ -37,6 +37,7 @@ import io.netty.util.concurrent.Promise;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -647,11 +648,14 @@ public class ClientCnx extends PulsarHandler {
         return state == State.Ready;
     }
 
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     public CompletableFuture<LookupDataResult> newLookup(ByteBuf request, long requestId) {
         CompletableFuture<LookupDataResult> future = new CompletableFuture<>();
 
         if (pendingLookupRequestSemaphore.tryAcquire()) {
             addPendingLookupRequests(requestId, future);
+            // System.out.format("ClientCnx - newLookup - %s - %ld- start\n",
+            //             sdf.format(System.currentTimeMillis()), requestId);
             ctx.writeAndFlush(request).addListener(writeFuture -> {
                 if (!writeFuture.isSuccess()) {
                     log.warn("{} Failed to send request {} to broker: {}", ctx.channel(), requestId,
@@ -677,6 +681,8 @@ public class ClientCnx extends PulsarHandler {
                     waitingLookupRequests.size())));
             }
         }
+        // System.out.format("ClientCnx - newLookup - %s - %ld - end\n",
+        //                 sdf.format(System.currentTimeMillis()), requestId);
         return future;
     }
 

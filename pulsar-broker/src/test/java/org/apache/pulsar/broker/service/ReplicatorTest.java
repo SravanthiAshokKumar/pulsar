@@ -251,7 +251,7 @@ public class ReplicatorTest extends ReplicatorTestBase {
         Mockito.verify(pulsarClient, Mockito.times(1))
                 .createProducerAsync(
                         Mockito.any(ProducerConfigurationData.class),
-                        Mockito.any(Schema.class), eq(null));
+                        Mockito.any(Schema.class), eq(null), 0);
 
         executor.shutdown();
     }
