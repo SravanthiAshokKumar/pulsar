@@ -107,12 +107,12 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 log.debug("[{}] Received cmd {}", ctx.channel().remoteAddress(), cmd.getType());
             }
             messageReceived();
-            System.out.format("PulsarDecoder - channelRead - start - %s - %s\n",
-                    sdf.format(System.currentTimeMillis()), cmd.getType());
+            // System.out.format("PulsarDecoder - channelRead - start - %s - %s\n",
+            //         sdf.format(System.currentTimeMillis()), cmd.getType());
             switch (cmd.getType()) {
             case PARTITIONED_METADATA:
-                System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - start - %s\n",
-                    sdf.format(System.currentTimeMillis()));
+                // System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - start - %s\n",
+                //     sdf.format(System.currentTimeMillis()));
                 checkArgument(cmd.hasPartitionMetadata());
                 try {
                     interceptCommand(cmd);
@@ -123,8 +123,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 } finally {
                     cmd.getPartitionMetadata().recycle();
                 }
-                System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - end - %s\n",
-                                    sdf.format(System.currentTimeMillis()));
+                // System.out.format("PulsarDecoder - channelRead_PARTITIONED_METADATA - end - %s\n",
+                //                     sdf.format(System.currentTimeMillis()));
                 break;
 
             case PARTITIONED_METADATA_RESPONSE:
@@ -136,13 +136,13 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
             case LOOKUP:
                 String s = new String(cmd.getLookupTopic().getTopic());
                 long requestId = cmd.getLookupTopic().getRequestId();
-                System.out.format("PulsarDecoder - channelRead_LOOKUP - start - %s - %s - %d\n",
-                    sdf.format(System.currentTimeMillis()), s, requestId);
+                // System.out.format("PulsarDecoder - channelRead_LOOKUP - start - %s - %s - %d\n",
+                //     sdf.format(System.currentTimeMillis()), s, requestId);
                 checkArgument(cmd.hasLookupTopic());
                 handleLookup(cmd.getLookupTopic());
                 cmd.getLookupTopic().recycle();
-                System.out.format("PulsarDecoder - channelRead_LOOKUP - end - %s - %s - %d\n",
-                                    sdf.format(System.currentTimeMillis()), s, requestId);
+                // System.out.format("PulsarDecoder - channelRead_LOOKUP - end - %s - %s - %d\n",
+                //                     sdf.format(System.currentTimeMillis()), s, requestId);
                 break;
 
             case LOOKUP_RESPONSE:
@@ -484,8 +484,8 @@ public abstract class PulsarDecoder extends ChannelInboundHandlerAdapter {
                 break;
             }
         } finally {
-            System.out.format("PulsarDecoder - channelRead - end - %s - %s\n",
-                    sdf.format(System.currentTimeMillis()), cmd.getType());
+            // System.out.format("PulsarDecoder - channelRead - end - %s - %s\n",
+            //         sdf.format(System.currentTimeMillis()), cmd.getType());
             if (cmdBuilder != null) {
                 cmdBuilder.recycle();
             }

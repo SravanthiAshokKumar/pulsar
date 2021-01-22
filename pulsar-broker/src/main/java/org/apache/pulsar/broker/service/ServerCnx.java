@@ -357,7 +357,7 @@ public class ServerCnx extends PulsarHandler {
         }
 
         TopicName topicName = validateTopicName(lookup.getTopic(), requestId, lookup);
-        System.out.format("ServerCnx - handleLookup - start - %s - %s\n", topicName, sdf.format(System.currentTimeMillis())); 
+        // System.out.format("ServerCnx - handleLookup - start - %s - %s\n", topicName, sdf.format(System.currentTimeMillis())); 
         if (topicName == null) {
             return;
         }
@@ -379,7 +379,7 @@ public class ServerCnx extends PulsarHandler {
                             requestId, advertisedListenerName).handle((lookupResponse, ex) -> {
                                 if (ex == null) {
                                     ctx.writeAndFlush(lookupResponse);
-                                    System.out.format("ServerCnx - handleLookup - end - %s - %s\n", topicName, sdf.format(System.currentTimeMillis()));
+                                    // System.out.format("ServerCnx - handleLookup - end - %s - %s\n", topicName, sdf.format(System.currentTimeMillis()));
                                 } else {
                                     // it should never happen
                                     log.warn("[{}] lookup failed with error {}, {}", remoteAddress, topicName,

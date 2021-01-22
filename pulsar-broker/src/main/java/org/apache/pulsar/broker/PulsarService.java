@@ -1099,6 +1099,7 @@ public class PulsarService implements AutoCloseable {
 
     private String brokerUrl(ServiceConfiguration config) {
         if (config.getBrokerServicePort().isPresent()) {
+            // System.out.println("*************** %s ***************", advertisedAddress(config));
             return brokerUrl(advertisedAddress(config), getBrokerListenPort().get());
         } else {
             return null;

@@ -202,6 +202,8 @@ public class BinaryProtoLookupService implements LookupService {
     private CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(InetSocketAddress socketAddress,
             TopicName topicName, int client_id) {
 
+	System.out.format("BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - start\n", client_id, sdf.format(System.currentTimeMillis()), topicName);
+
         CompletableFuture<PartitionedTopicMetadata> partitionFuture = new CompletableFuture<PartitionedTopicMetadata>();
 
         client.getCnxPool().getConnection(socketAddress).thenAccept(clientCnx -> {

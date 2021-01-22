@@ -195,6 +195,6 @@ class PulsarConsumerSource<T> extends MessageAcknowledgingSourceBase<T, MessageI
     }
 
     Consumer<byte[]> createConsumer(PulsarClient client) throws PulsarClientException {
-        return ((PulsarClientImpl) client).subscribeAsync(consumerConfigurationData).join();
+        return ((PulsarClientImpl) client).subscribeAsync(consumerConfigurationData, 0).join();
     }
 }
