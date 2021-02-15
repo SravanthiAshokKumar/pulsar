@@ -144,7 +144,7 @@ public class PulsarClientV1Impl implements PulsarClient {
         ConsumerConfigurationData<byte[]> confData = conf.getConfigurationData().clone();
         confData.getTopicNames().add(topic);
         confData.setSubscriptionName(subscription);
-        return client.subscribeAsync(confData).thenApply(c -> new ConsumerV1Impl(c));
+        return client.subscribeAsync(confData,0).thenApply(c -> new ConsumerV1Impl(c));
     }
 
     @Override

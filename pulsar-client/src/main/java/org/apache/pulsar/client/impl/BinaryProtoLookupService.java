@@ -112,8 +112,8 @@ public class BinaryProtoLookupService implements LookupService {
             boolean authoritative, TopicName topicName, int client_id, final int redirectCount) {
         CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> addressFuture = new CompletableFuture<>();
 
-        System.out.format("lookup - getBroker - %d - %s - %s - start\n", client_id,
-                sdf.format(System.currentTimeMillis()), topicName);
+        // System.out.format("lookup - getBroker - %d - %s - %s - start\n", client_id,
+        //         sdf.format(System.currentTimeMillis()), topicName);
         if (maxLookupRedirects > 0 && redirectCount > maxLookupRedirects) {
             addressFuture.completeExceptionally(
                     new PulsarClientException.LookupException("Too many redirects: " + maxLookupRedirects));
@@ -124,8 +124,8 @@ public class BinaryProtoLookupService implements LookupService {
             long requestId = client.newRequestId();
             ByteBuf request = Commands.newLookup(topicName.toString(), listenerName, authoritative, requestId);
             clientCnx.newLookup(request, requestId).whenComplete((r, t) -> {
-                System.out.format("lookup - getBroker - %d - %s - %s - %d - end\n", client_id,
-                        sdf.format(System.currentTimeMillis()), topicName, requestId);
+                // System.out.format("lookup - getBroker - %d - %s - %s - %d - end\n", client_id,
+                //         sdf.format(System.currentTimeMillis()), topicName, requestId);
                 final StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
                 for (StackTraceElement element : stackTrace) {
                     System.out.println(element.getMethodName() + " in class " + element.getClassName()
@@ -181,8 +181,8 @@ public class BinaryProtoLookupService implements LookupService {
                                 addressFuture.complete(Pair.of(responseBrokerAddress, responseBrokerAddress));
                             }
                         }
-                        System.out.format("lookup - getBroker - %d - %s - %s - lastEnd\n", client_id,
-                                sdf.format(System.currentTimeMillis()), topicName);
+                        // System.out.format("lookup - getBroker - %d - %s - %s - lastEnd\n", client_id,
+                        //         sdf.format(System.currentTimeMillis()), topicName);
                     } catch (Exception parseUrlException) {
                         // Failed to parse url
                         log.warn("[{}] invalid url {} : {}", topicName.toString(), uri, parseUrlException.getMessage(),
@@ -202,7 +202,7 @@ public class BinaryProtoLookupService implements LookupService {
     private CompletableFuture<PartitionedTopicMetadata> getPartitionedTopicMetadata(InetSocketAddress socketAddress,
             TopicName topicName, int client_id) {
 
-	System.out.format("BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - start\n", client_id, sdf.format(System.currentTimeMillis()), topicName);
+	// System.out.format("BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - start\n", client_id, sdf.format(System.currentTimeMillis()), topicName);
 
         CompletableFuture<PartitionedTopicMetadata> partitionFuture = new CompletableFuture<PartitionedTopicMetadata>();
 
@@ -216,8 +216,8 @@ public class BinaryProtoLookupService implements LookupService {
                 } else {
                     try {
                         partitionFuture.complete(new PartitionedTopicMetadata(r.partitions));
-                        System.out.format("BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - end\n",
-                                client_id, sdf.format(System.currentTimeMillis()), topicName);
+                        // System.out.format("BinaryLookupService - getPartitionedTopicMetadata - %d - %s - %s - end\n",
+                        //         client_id, sdf.format(System.currentTimeMillis()), topicName);
                     } catch (Exception e) {
                         partitionFuture.completeExceptionally(new PulsarClientException.LookupException(
                                 format("Failed to parse partition-response redirect=%s, topic=%s, partitions with %s",
