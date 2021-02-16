@@ -83,7 +83,7 @@ public class SparkStreamingPulsarReceiver extends Receiver<byte[]> {
     public void onStart() {
         try {
             pulsarClient = PulsarClient.builder().serviceUrl(serviceUrl).authentication(authentication).build();
-            consumer = ((PulsarClientImpl) pulsarClient).subscribeAsync(conf).join();
+            consumer = ((PulsarClientImpl) pulsarClient).subscribeAsync(conf, 0).join();
         } catch (Exception e) {
             LOG.error("Failed to start subscription : {}", e.getMessage());
             restart("Restart a consumer");
