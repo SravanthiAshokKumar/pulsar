@@ -95,7 +95,7 @@ public class SharedPulsarClient {
         synchronized (this) {
             if (consumer == null) {
                 try {
-                    consumer = client.subscribeAsync(consumerConf).join();
+                    consumer = client.subscribeAsync(consumerConf, 0).join();
                 } catch (CompletionException e) {
                     throw (PulsarClientException) e.getCause();
                 }

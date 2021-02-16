@@ -299,7 +299,7 @@ public class PulsarSpout extends BaseRichSpout implements IMetric {
             try {
                 consumer = pulsarSpoutConf.isDurableSubscription()
                         ? new SpoutConsumer(sharedPulsarClient.getClient()
-                                .subscribeAsync(newConsumerConfiguration()).join())
+                                .subscribeAsync(newConsumerConfiguration(), 0).join())
                         : new SpoutReader(sharedPulsarClient.getClient()
                                 .createReaderAsync(newReaderConfiguration()).join());
             } catch (CompletionException e) {
